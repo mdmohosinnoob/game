@@ -5,47 +5,103 @@
    ========================================================= */
 const $ = (id) => document.getElementById(id);
 
-const target = $('target');
+const arena = $('arena');
 const statusText = $('status');
 const music = $('bgMusic');
 const gun = $('gun');
 const scoreDisplay = $('score');
 const targetScoreDisplay = $('target-score');
+const levelNameDisplay = $('level-name');
 const progressBar = $('progressBar');
 const header = document.querySelector('.header');
 
 const startModal = $('startModal');
+const quitModal = $('quitModal');
 const gameOverModal = $('gameOverModal');
-const startBtn = $('startBtn');
+const quitBtn = $('quitBtn');
+const resumeBtn = $('resumeBtn');
+const quitConfirmBtn = $('quitConfirmBtn');
 const restartBtn = $('restartBtn');
 
 /* =========================================================
-   Config & State
+   Config (এখান থেকেই সব বদলানো যায়)
    ========================================================= */
 const CONFIG = {
     targetScore: 50,
     pointsPerHit: 10,
-    moveEveryMs: 1600,   // টার্গেট কতক্ষণ পরপর জায়গা বদলাবে
-    hitCooldownMs: 250,  // হিটের পর এত ms এর মধ্যে আরেকটা হিট গোনা হবে না
+    wrongPenalty: 10,     // ভুল লোককে গুলি করলে কত পয়েন্ট কাটবে
+    hitCooldownMs: 250,
     bulletMs: 140,
-    gunshotVolume: 0.5
+    gunshotVolume: 0.5,
+
+    targetImage: 'target.png.png', // আসল লোকের ছবি (ফাইলের নাম ঠিক করে নাও)
+
+    // চাইলে অন্য মানুষের ছবি এখানে দাও, যেমন ['img/p1.png', 'img/p2.png'].
+    // ফাঁকা থাকলে আসল ছবিটাই সাজ বদলে নকল হিসেবে ব্যবহার হবে।
+    decoyImages: [],
+
+    accessories: ['🎩', '🧢', '🕶️', '😷', '👑', '🥸', '🎭', '🤡'],
+    obstacleEmojis: ['🌳', '🪨', '📦', '🌿', '🧱']
+};
+
+/*
+  decoys          : নকল লোকের সংখ্যা
+  size            : প্রতিটা লোকের মাপ (px)
+  moveMs          : কতক্ষণ পরপর সবাই জায়গা বদলাবে
+  hue             : নকল লোকের রঙ কতটা বদলাবে (ডিগ্রি) — কম মানে বেশি কঠিন
+  accessoryChance : নকল লোকের টুপি/চশমা থাকার সম্ভাবনা (০ থেকে ১)
+  accessorySize   : টুপি/চশমার মাপ (লোকের মাপের অনুপাতে)
+  glow            : আসল লোকের গায়ে আলো থাকবে কিনা
+  obstacles       : গাছ/বাক্সের সংখ্যা (আংশিক আড়াল করে)
+*/
+const LEVELS = {
+    easy: {
+        name: 'সহজ 🟢',
+        decoys: 4, size: 120, moveMs: 2600,
+        hue: [90, 270], accessoryChance: 1, accessorySize: 0.45,
+        glow: true, obstacles: 0,
+        hint: 'আসল লোকটির চারপাশে গোলাপি আলো আছে, তাকে গুলি করো!'
+    },
+    medium: {
+        name: 'মধ্যম 🟡',
+        decoys: 10, size: 84, moveMs: 2000,
+        hue: [25, 60], accessoryChance: 0.7, accessorySize: 0.32,
+        glow: false, obstacles: 3,
+        hint: 'যার কোনো সাজ নেই আর রঙ আসল, তাকে খুঁজে বের করো!'
+    },
+    hard: {
+        name: 'কঠিন 🔴',
+        decoys: 19, size: 64, moveMs: 1500,
+        hue: [14, 26], accessoryChance: 0.4, accessorySize: 0.24,
+        glow: false, obstacles: 6,
+        hint: 'ভালো করে খোঁজো! আসল লোকের কোনো সাজ নেই, রঙও একদম আসল।'
+    }
 };
 
 const state = {
     score: 0,
+    level: null,
+    charSize: 100,
+    chars: [],          // { el, isTarget }
+    obstacles: [],
     isGameStarted: false,
+    isPaused: false,
     isSongPlaying: false,
     lastHitAt: 0,
-    moveTimer: null
+    shuffleTimer: null,
+    endTimer: null
 };
 
-const DEFAULT_STATUS = 'গেম শুরু করতে START চাপুন';
+const DEFAULT_STATUS = 'গেম শুরু করতে একটি লেভেল বেছে নাও';
 
 targetScoreDisplay.textContent = CONFIG.targetScore;
 
 /* =========================================================
    Helpers
    ========================================================= */
+const rand = (min, max) => min + Math.random() * (max - min);
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
 function setStatus(text, color = '#ffffff') {
     statusText.style.color = color;
     statusText.textContent = text;
@@ -54,7 +110,7 @@ function setStatus(text, color = '#ffffff') {
 // একই CSS animation আবার চালানোর জন্য
 function retriggerClass(el, className) {
     el.classList.remove(className);
-    void el.offsetWidth; // reflow জোর করে করানো
+    void el.offsetWidth;
     el.classList.add(className);
 }
 
@@ -106,7 +162,7 @@ function playGunshotSound() {
 }
 
 /* =========================================================
-   Gun cursor (মাউস + টাচ দুটোতেই কাজ করে)
+   Gun cursor
    ========================================================= */
 let pointerX = -100;
 let pointerY = -100;
@@ -122,7 +178,6 @@ function trackPointer(e) {
     pointerY = e.clientY;
     gun.classList.add('visible');
 
-    // প্রতি ফ্রেমে সর্বোচ্চ একবার আপডেট, তাই লাগ কম
     if (!gunFrameQueued) {
         gunFrameQueued = true;
         requestAnimationFrame(renderGun);
@@ -132,10 +187,89 @@ function trackPointer(e) {
 document.addEventListener('pointermove', trackPointer);
 
 /* =========================================================
-   Target movement
+   Arena তৈরি: আসল লোক + নকল লোক + আড়াল
    ========================================================= */
-function getRandomPosition() {
-    const size = target.offsetWidth;
+function getCharSize(level) {
+    const limit = Math.round(Math.min(window.innerWidth, window.innerHeight) * 0.22);
+    return Math.max(48, Math.min(level.size, limit));
+}
+
+function createChar(isTarget, level, size, zIndex) {
+    const el = document.createElement('div');
+    el.className = 'char';
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    el.style.zIndex = zIndex;
+
+    const img = document.createElement('img');
+    img.className = 'char-img';
+    img.alt = '';
+    img.draggable = false;
+
+    const useSameImage = CONFIG.decoyImages.length === 0;
+
+    if (isTarget) {
+        img.src = CONFIG.targetImage;
+        if (level.glow) el.classList.add('glow');
+    } else if (useSameImage) {
+        // নকল লোক: একই ছবি, কিন্তু রঙ বদলানো আর (সম্ভাবনা অনুযায়ী) টুপি/চশমা
+        img.src = CONFIG.targetImage;
+        const sign = level.hue[0] >= 90 ? 1 : (Math.random() < 0.5 ? -1 : 1);
+        const deg = Math.round(rand(level.hue[0], level.hue[1]) * sign);
+        img.style.filter = `hue-rotate(${deg}deg)`;
+    } else {
+        img.src = pick(CONFIG.decoyImages);
+    }
+
+    el.appendChild(img);
+
+    if (!isTarget && useSameImage && Math.random() < level.accessoryChance) {
+        const acc = document.createElement('span');
+        acc.className = 'char-acc';
+        acc.textContent = pick(CONFIG.accessories);
+        acc.style.fontSize = `${Math.round(size * level.accessorySize)}px`;
+        acc.style.top = `${Math.round(rand(-8, 35))}%`;
+        el.appendChild(acc);
+    }
+
+    return el;
+}
+
+function buildArena() {
+    const level = state.level;
+    arena.textContent = '';
+    state.chars = [];
+    state.obstacles = [];
+    state.charSize = getCharSize(level);
+
+    arena.style.setProperty('--move-ms', `${Math.round(level.moveMs * 0.3)}ms`);
+
+    const total = level.decoys + 1;
+    const targetIndex = Math.floor(Math.random() * total);
+
+    for (let i = 0; i < total; i++) {
+        const isTarget = i === targetIndex;
+        // আসল লোক সবসময় নকলদের উপরে থাকে, যাতে পুরো ঢাকা পড়ে না যায়
+        const zIndex = isTarget ? total + 1 : 1 + Math.floor(Math.random() * total);
+        const el = createChar(isTarget, level, state.charSize, zIndex);
+        arena.appendChild(el);
+        state.chars.push({ el, isTarget });
+    }
+
+    for (let i = 0; i < level.obstacles; i++) {
+        const el = document.createElement('div');
+        el.className = 'obstacle';
+        el.textContent = pick(CONFIG.obstacleEmojis);
+        el.style.fontSize = `${Math.round(state.charSize * 0.75)}px`;
+        arena.appendChild(el);
+        state.obstacles.push(el);
+    }
+}
+
+/* =========================================================
+   সবাইকে নতুন জায়গায় সরানো
+   ========================================================= */
+function getRandomPosition(size) {
     const margin = 20;
     const minY = header.getBoundingClientRect().bottom + 10;
     const maxX = Math.max(margin, window.innerWidth - size - margin);
@@ -147,30 +281,49 @@ function getRandomPosition() {
     };
 }
 
-function moveTarget(instant = false) {
-    const { x, y } = getRandomPosition();
+function place(el, x, y) {
+    el.style.transform = `translate3d(${Math.max(0, x)}px, ${Math.max(0, y)}px, 0)`;
+}
 
-    if (instant) target.classList.add('no-anim');
-    target.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+function shuffleArena(instant = false) {
+    if (!state.chars.length) return;
+    const size = state.charSize;
+
+    if (instant) arena.classList.add('no-anim');
+
+    const positions = state.chars.map((c) => {
+        const p = getRandomPosition(size);
+        place(c.el, p.x, p.y);
+        return p;
+    });
+
+    // আড়াল: কোনো একজন লোকের কাছাকাছি বসে আংশিক ঢেকে দেয়
+    state.obstacles.forEach((el) => {
+        const base = pick(positions);
+        const dx = rand(0.3, 0.6) * size * (Math.random() < 0.5 ? -1 : 1);
+        const dy = rand(0.3, 0.6) * size * (Math.random() < 0.5 ? -1 : 1);
+        place(el, base.x + dx, base.y + dy);
+    });
+
     if (instant) {
-        void target.offsetWidth;
-        target.classList.remove('no-anim');
+        void arena.offsetWidth;
+        arena.classList.remove('no-anim');
     }
 }
 
-function stopTargetMovement() {
-    clearInterval(state.moveTimer);
-    state.moveTimer = null;
+function stopShuffle() {
+    clearInterval(state.shuffleTimer);
+    state.shuffleTimer = null;
 }
 
-function startTargetMovement(instant = false) {
-    stopTargetMovement();
-    moveTarget(instant);
-    state.moveTimer = setInterval(moveTarget, CONFIG.moveEveryMs);
+function startShuffle(instant = false) {
+    stopShuffle();
+    shuffleArena(instant);
+    state.shuffleTimer = setInterval(() => shuffleArena(), state.level.moveMs);
 }
 
 window.addEventListener('resize', () => {
-    if (target.style.display === 'flex') moveTarget(true);
+    if (state.isGameStarted && !state.isPaused) shuffleArena(true);
 });
 
 /* =========================================================
@@ -215,8 +368,26 @@ function createEffect(x, y, text, color) {
 /* =========================================================
    Shooting
    ========================================================= */
+// ক্লিকের জায়গায় কোন লোক আছে (একাধিক থাকলে সবচেয়ে উপরেরজন)
+function findCharAt(x, y) {
+    let best = null;
+
+    for (const char of state.chars) {
+        const rect = char.el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        if (Math.hypot(x - cx, y - cy) <= rect.width / 2) {
+            const z = Number(char.el.style.zIndex) || 0;
+            if (!best || z > best.z) best = { char, cx, cy, z };
+        }
+    }
+    return best;
+}
+
 function handleShot(e) {
-    if (!state.isGameStarted || e.button !== 0 || e.target.closest('.modal')) return;
+    if (!state.isGameStarted || state.isPaused || e.button !== 0) return;
+    if (e.target.closest('.modal, .quit-btn')) return;
 
     trackPointer(e);
     const x = e.clientX;
@@ -227,34 +398,33 @@ function handleShot(e) {
     setTimeout(() => gun.classList.remove('fire'), 100);
     createMuzzleFlash(x, y);
 
-    // গোল টার্গেট: কেন্দ্র থেকে দূরত্ব <= ব্যাসার্ধ হলে হিট
-    const rect = target.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    const found = findCharAt(x, y);
     const now = performance.now();
 
-    const isHit =
-        Math.hypot(x - centerX, y - centerY) <= rect.width / 2 &&
-        now - state.lastHitAt > CONFIG.hitCooldownMs;
+    let result = 'miss';
+    if (found) {
+        if (!found.char.isTarget) result = 'wrong';
+        else result = now - state.lastHitAt > CONFIG.hitCooldownMs ? 'hit' : 'ignore';
+    }
 
-    createBullet(x, y, isHit ? centerX : x, isHit ? centerY : y);
+    createBullet(x, y, found ? found.cx : x, found ? found.cy : y);
 
-    if (isHit) {
+    if (result === 'hit') {
         state.lastHitAt = now;
-        onHit(centerX, centerY);
-    } else {
+        onHit(found);
+    } else if (result === 'wrong') {
+        onWrong(found);
+    } else if (result === 'miss') {
         onMiss(x, y);
     }
 }
 
-function onHit(centerX, centerY) {
-    createEffect(centerX, centerY, `+${CONFIG.pointsPerHit} HIT!`, '#00ff88');
-    target.classList.add('hit');
-    setTimeout(() => target.classList.remove('hit'), 120);
+function onHit(found) {
+    createEffect(found.cx, found.cy, `+${CONFIG.pointsPerHit} HIT!`, '#00ff88');
+    found.char.el.classList.add('hit');
 
     if (state.isSongPlaying) return;
 
-    // স্কোর সাথে সাথে যোগ হয়, তাই দ্রুত ডাবল ক্লিকে ভুল হয় না
     state.score += CONFIG.pointsPerHit;
     updateScore();
 
@@ -265,7 +435,25 @@ function onHit(centerX, centerY) {
 
     const remaining = (CONFIG.targetScore - state.score) / CONFIG.pointsPerHit;
     setStatus(`🎯 দারুণ! গান বাজতে আর ${remaining} টি শট বাকি!`, '#ffcc00');
-    startTargetMovement(); // নতুন জায়গায় সরানো + টাইমার রিসেট
+
+    // একটু পরে নতুন করে সবাইকে সাজিয়ে আবার খোঁজার রাউন্ড শুরু
+    setTimeout(() => {
+        if (state.isGameStarted && !state.isPaused && !state.isSongPlaying) {
+            buildArena();
+            startShuffle(true);
+        }
+    }, 180);
+}
+
+function onWrong(found) {
+    createEffect(found.cx, found.cy, `-${CONFIG.wrongPenalty} ভুল লোক!`, '#ff9900');
+    retriggerClass(found.char.el, 'wrong');
+
+    if (state.isSongPlaying) return;
+
+    state.score = Math.max(0, state.score - CONFIG.wrongPenalty);
+    updateScore();
+    setStatus('❌ ভুল লোক! আসল লোকটিকে খুঁজে বের করো', '#ff9900');
 }
 
 function onMiss(x, y) {
@@ -275,7 +463,6 @@ function onMiss(x, y) {
     }
 }
 
-// pointerdown ব্যবহার করায় ক্লিকের সাথে সাথেই গুলি হয় (click এর চেয়ে দ্রুত)
 document.addEventListener('pointerdown', handleShot);
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -283,32 +470,46 @@ document.addEventListener('contextmenu', (e) => e.preventDefault());
    Game flow
    ========================================================= */
 function resetGame() {
-    stopTargetMovement();
+    stopShuffle();
+    clearTimeout(state.endTimer);
     music.removeEventListener('ended', showGameOver);
     music.pause();
     music.currentTime = 0;
 
+    arena.textContent = '';
+    state.chars = [];
+    state.obstacles = [];
+
     state.score = 0;
+    state.isGameStarted = false;
+    state.isPaused = false;
     state.isSongPlaying = false;
     state.lastHitAt = 0;
+
+    quitBtn.classList.remove('visible');
+    levelNameDisplay.textContent = '-';
     updateScore();
 }
 
-function startGame() {
+function startGame(levelKey) {
     getAudioContext(); // ইউজারের ক্লিকেই সাউন্ড আনলক
     resetGame();
 
+    state.level = LEVELS[levelKey];
     state.isGameStarted = true;
-    startModal.classList.remove('active');
+    levelNameDisplay.textContent = state.level.name;
 
-    target.style.display = 'flex';
-    setStatus('নিশানা লাগাও!');
-    startTargetMovement(true);
+    startModal.classList.remove('active');
+    quitBtn.classList.add('visible');
+    setStatus(state.level.hint);
+
+    buildArena();
+    startShuffle(true);
 }
 
 function finishMission() {
     state.isSongPlaying = true;
-    stopTargetMovement();
+    stopShuffle();
     setStatus('🎉 মিশন কমপ্লিট! গান চলছে... 🎶', '#00ff88');
 
     if (!music) {
@@ -320,22 +521,72 @@ function finishMission() {
     music.addEventListener('ended', showGameOver, { once: true });
     music.play().catch((err) => {
         console.log('Music error:', err);
-        setTimeout(showGameOver, 1500); // গান না বাজলেও গেম যেন আটকে না থাকে
+        state.endTimer = setTimeout(showGameOver, 1500); // গান না বাজলেও গেম আটকে থাকবে না
     });
 }
 
 function showGameOver() {
     state.isGameStarted = false;
-    target.style.display = 'none';
+    arena.textContent = '';
+    state.chars = [];
+    quitBtn.classList.remove('visible');
     gameOverModal.classList.add('active');
 }
 
-function restartGame() {
-    gameOverModal.classList.remove('active');
-    resetGame();
+function showMenu() {
     setStatus(DEFAULT_STATUS);
     startModal.classList.add('active');
 }
 
-startBtn.addEventListener('click', startGame);
-restartBtn.addEventListener('click', restartGame);
+/* ---------- Pause / Quit ---------- */
+function pauseGame() {
+    if (!state.isGameStarted || state.isPaused) return;
+    state.isPaused = true;
+    stopShuffle();
+    if (state.isSongPlaying) music.pause();
+    quitModal.classList.add('active');
+}
+
+function resumeGame() {
+    if (!state.isPaused) return;
+    state.isPaused = false;
+    quitModal.classList.remove('active');
+
+    if (state.isSongPlaying) {
+        music.play().catch((err) => console.log('Music error:', err));
+    } else {
+        startShuffle();
+    }
+}
+
+function quitGame() {
+    quitModal.classList.remove('active');
+    resetGame();
+    showMenu();
+}
+
+quitBtn.addEventListener('click', pauseGame);
+resumeBtn.addEventListener('click', resumeGame);
+quitConfirmBtn.addEventListener('click', quitGame);
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (state.isPaused) resumeGame();
+    else pauseGame();
+});
+
+// ট্যাব বদলালে গেম নিজে থেকে থামবে
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pauseGame();
+});
+
+/* ---------- Buttons ---------- */
+document.querySelectorAll('.level-btn').forEach((btn) => {
+    btn.addEventListener('click', () => startGame(btn.dataset.level));
+});
+
+restartBtn.addEventListener('click', () => {
+    gameOverModal.classList.remove('active');
+    resetGame();
+    showMenu();
+});

@@ -17,33 +17,64 @@
     </div>
 
     <header class="header">
-        <h1>বন্দুক দিয়ে নিশানা লাগাও! 🔫🎯</h1>
+        <h1>ভিড়ের মধ্যে আসল লোককে খুঁজে গুলি করো! 🔫🎯</h1>
         <p>৫০ পয়েন্ট অর্জন করলে সম্পূর্ণ গান বাজবে</p>
 
         <div class="score-board">
             <span>স্কোর: <strong id="score">0</strong></span> |
-            <span>টার্গেট: <strong id="target-score">50</strong></span>
+            <span>টার্গেট: <strong id="target-score">50</strong></span> |
+            <span>লেভেল: <strong id="level-name">-</strong></span>
         </div>
 
         <div class="progress" aria-hidden="true">
             <div class="progress-bar" id="progressBar"></div>
         </div>
 
-        <div id="status" aria-live="polite">গেম শুরু করতে START চাপুন</div>
+        <div id="status" aria-live="polite">গেম শুরু করতে একটি লেভেল বেছে নাও</div>
     </header>
 
-    <!-- Target Person Box -->
-    <div class="target" id="target" aria-hidden="true">
-        <!-- ফাইলের আসল নাম যদি target.png হয়, তাহলে নিচের src ঠিক করে নাও -->
-        <img src="target.png.png" alt="" class="target-img" draggable="false">
-    </div>
+    <!-- সব লোক (আসল + নকল) এই জায়গায় JS দিয়ে তৈরি হয় -->
+    <div class="arena" id="arena" aria-hidden="true"></div>
 
-    <!-- Start Overlay Modal -->
+    <!-- Quit Button (গেম চলার সময় দেখা যায়) -->
+    <button class="quit-btn" id="quitBtn" type="button">✖ QUIT (Esc)</button>
+
+    <!-- Start Overlay Modal: লেভেল বাছাই -->
     <div class="modal active" id="startModal" role="dialog" aria-modal="true" aria-labelledby="startTitle">
         <div class="modal-content">
             <h1 id="startTitle">SNIPER TARGET SHOOTER</h1>
-            <p>আপনার লক্ষ্য হলো ৫০ পয়েন্ট সংগ্রহ করা!</p>
-            <button class="game-btn" id="startBtn" type="button">START GAME 🎯</button>
+            <p>ভিড়ের মধ্যে আসল লোকটিকে খুঁজে বের করে গুলি করো!</p>
+            <p class="rules">
+                আসল লোকের কোনো টুপি/চশমা নেই আর রঙ একদম আসল।
+                ভুল লোককে গুলি করলে −১০ পয়েন্ট!
+            </p>
+
+            <div class="level-list">
+                <button class="game-btn level-btn" data-level="easy" type="button">
+                    EASY 🟢
+                    <small>কম ভিড়, আসল লোকের গায়ে গোলাপি আলো</small>
+                </button>
+                <button class="game-btn level-btn" data-level="medium" type="button">
+                    MEDIUM 🟡
+                    <small>বেশি ভিড়, গাছ-বাক্সের আড়াল</small>
+                </button>
+                <button class="game-btn level-btn" data-level="hard" type="button">
+                    HARD 🔴
+                    <small>অনেক ভিড়, প্রায় একই চেহারা</small>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pause / Quit Modal -->
+    <div class="modal" id="quitModal" role="dialog" aria-modal="true" aria-labelledby="quitTitle">
+        <div class="modal-content">
+            <h1 id="quitTitle">গেম থামানো হয়েছে ⏸</h1>
+            <p>গেম ছেড়ে দিলে এই রাউন্ডের স্কোর হারিয়ে যাবে।</p>
+            <div class="modal-actions">
+                <button class="game-btn" id="resumeBtn" type="button">চালিয়ে যাও ▶</button>
+                <button class="game-btn secondary" id="quitConfirmBtn" type="button">গেম ছেড়ে দাও 🚪</button>
+            </div>
         </div>
     </div>
 
