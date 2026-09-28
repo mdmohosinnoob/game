@@ -2,25 +2,58 @@
 <html lang="bn">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sniper Heart Shooter 🎯</title>
-    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@600;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Sniper Target Shooter 🎯</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
     <!-- Gun Pointer Cursor -->
-    <div class="gun-cursor" id="gun">🔫</div>
-
-    <div class="header">
-        <h1>বন্দুক দিয়ে পুটকি nishana koro ! 🔫🎯</h1>
-        <p>বঙ্গবন্ধুর পুটকিতে মারো </p>
-        <div id="status"></div>
+    <div class="gun-cursor" id="gun" aria-hidden="true">
+        <span class="gun-icon">🔫</span>
     </div>
 
+    <header class="header">
+        <h1>বন্দুক দিয়ে নিশানা লাগাও! 🔫🎯</h1>
+        <p>৫০ পয়েন্ট অর্জন করলে সম্পূর্ণ গান বাজবে</p>
+
+        <div class="score-board">
+            <span>স্কোর: <strong id="score">0</strong></span> |
+            <span>টার্গেট: <strong id="target-score">50</strong></span>
+        </div>
+
+        <div class="progress" aria-hidden="true">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div id="status" aria-live="polite">গেম শুরু করতে START চাপুন</div>
+    </header>
+
     <!-- Target Person Box -->
-    <div class="target" id="target">
-        <img src="target.png.png" alt="Target Person" class="target-img">
+    <div class="target" id="target" aria-hidden="true">
+        <!-- ফাইলের আসল নাম যদি target.png হয়, তাহলে নিচের src ঠিক করে নাও -->
+        <img src="target.png.png" alt="" class="target-img" draggable="false">
+    </div>
+
+    <!-- Start Overlay Modal -->
+    <div class="modal active" id="startModal" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+        <div class="modal-content">
+            <h1 id="startTitle">SNIPER TARGET SHOOTER</h1>
+            <p>আপনার লক্ষ্য হলো ৫০ পয়েন্ট সংগ্রহ করা!</p>
+            <button class="game-btn" id="startBtn" type="button">START GAME 🎯</button>
+        </div>
+    </div>
+
+    <!-- Game End Overlay Modal -->
+    <div class="modal" id="gameOverModal" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+        <div class="modal-content">
+            <h1 class="end-title" id="endTitle">THE END</h1>
+            <p>অভিনন্দন! গানটি সম্পূর্ণ শুনে মিশন শেষ করেছেন 🏆</p>
+            <button class="game-btn" id="restartBtn" type="button">RESTART GAME 🔄</button>
+        </div>
     </div>
 
     <!-- Audio Tag -->
