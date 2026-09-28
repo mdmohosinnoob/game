@@ -1,0 +1,131 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Hind Siliguri', sans-serif;
+}
+
+body {
+    background-color: #08020f;
+    color: #ffffff;
+    height: 100vh;
+    overflow: hidden;
+    cursor: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    user-select: none;
+}
+
+/* Gun Cursor Design */
+.gun-cursor {
+    position: fixed;
+    font-size: 50px;
+    pointer-events: none;
+    transform: translate(-10px, -10px);
+    z-index: 9999;
+    filter: drop-shadow(0 0 8px #ff0055);
+    transition: transform 0.05s ease;
+}
+
+/* Gun Recoil Effect */
+.gun-cursor.fire {
+    transform: translate(-10px, -10px) rotate(-20deg) scale(1.2);
+}
+
+.header {
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
+}
+
+h1 {
+    font-size: 2.2rem;
+    color: #ff4d6d;
+    text-shadow: 0 0 15px #ff4d6d;
+}
+
+p {
+    color: #e0aaff;
+    font-size: 1.1rem;
+    margin-top: 5px;
+}
+
+#status {
+    font-size: 1.4rem;
+    font-weight: bold;
+    margin-top: 15px;
+    height: 35px;
+}
+
+/* Target Box Container */
+.target {
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    background: radial-gradient(circle, #ff007f 0%, #4a0026 100%);
+    border: 3px solid #ff4d6d;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 30px #ff007f;
+    transition: left 0.3s ease, top 0.3s ease;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.target-img {
+    width: 85%;
+    height: 85%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+/* Animated Flying Bullet */
+.flying-bullet {
+    position: absolute;
+    width: 14px;
+    height: 6px;
+    background: linear-gradient(90deg, #ffff00, #ff5500);
+    border-radius: 50%;
+    box-shadow: 0 0 10px #ffcc00, 0 0 20px #ff3300;
+    pointer-events: none;
+    z-index: 9998;
+    transition: all 0.2s linear;
+}
+
+/* Bullet Flash Effect */
+.muzzle-flash {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: radial-gradient(circle, #fff 10%, #ffcc00 50%, transparent 100%);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 999;
+    animation: flashAnim 0.15s ease-out forwards;
+}
+
+@keyframes flashAnim {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+}
+
+.effect {
+    position: absolute;
+    font-size: 1.8rem;
+    font-weight: bold;
+    pointer-events: none;
+    animation: fadeUp 0.6s ease-out forwards;
+    z-index: 101;
+}
+
+@keyframes fadeUp {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-35px) scale(1.4); }
+}
