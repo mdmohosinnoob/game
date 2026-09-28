@@ -121,6 +121,16 @@ p {
     100% { transform: scale(1); }
 }
 
+.score-board strong.danger {
+    color: #ff3333;
+    animation: dangerPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes dangerPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+}
+
 .progress {
     width: min(320px, 80vw);
     height: 8px;
@@ -205,6 +215,24 @@ p {
     translate: -50% 0;
     line-height: 1;
     pointer-events: none;
+}
+
+/* আসল লোকের উপরের ছোট লাল ডট */
+.char-marker {
+    position: absolute;
+    top: -6px;
+    right: 8%;
+    background: #ff0000;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #ff0000;
+    pointer-events: none;
+    animation: markerPulse 1s ease-in-out infinite;
+}
+
+@keyframes markerPulse {
+    0%, 100% { scale: 1; }
+    50% { scale: 1.25; }
 }
 
 /* আড়াল করার জিনিস (গাছ, বাক্স) */
@@ -346,6 +374,11 @@ p {
     text-shadow: 0 0 20px var(--green);
     letter-spacing: 4px;
     margin-bottom: 10px;
+}
+
+.lose-title {
+    color: #ff3333;
+    text-shadow: 0 0 20px #ff3333;
 }
 
 .game-btn {

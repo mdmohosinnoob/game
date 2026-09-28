@@ -8,16 +8,22 @@ const $ = (id) => document.getElementById(id);
 const arena = $('arena');
 const statusText = $('status');
 const music = $('bgMusic');
+const loseMusic = $('loseMusic'); // সময় শেষ হলে বাজবে (music1.mp3)
 const gun = $('gun');
 const scoreDisplay = $('score');
 const targetScoreDisplay = $('target-score');
 const levelNameDisplay = $('level-name');
+const timeDisplay = $('time-left');
+const finalScoreDisplay = $('finalScore');
 const progressBar = $('progressBar');
 const header = document.querySelector('.header');
 
 const startModal = $('startModal');
 const quitModal = $('quitModal');
 const gameOverModal = $('gameOverModal');
+const timeUpModal = $('timeUpModal');
+const retryBtn = $('retryBtn');
+const timeUpMenuBtn = $('timeUpMenuBtn');
 const quitBtn = $('quitBtn');
 const resumeBtn = $('resumeBtn');
 const quitConfirmBtn = $('quitConfirmBtn');
@@ -40,11 +46,12 @@ const CONFIG = {
     // ফাঁকা থাকলে আসল ছবিটাই সাজ বদলে নকল হিসেবে ব্যবহার হবে।
     decoyImages: [],
 
-    accessories: ['🎩', '🧢', '🕶️', '😷', '👑', '🥸', '🎭', '🤡'],
+    accessories: ['🎩', '🧢', '🕶️', '😷', '👑', '🥸', '🎭', '🤠'], // লাল কিছু নেই, যাতে আসল লোকের লাল ডটের সাথে গুলিয়ে না যায়
     obstacleEmojis: ['🌳', '🪨', '📦', '🌿', '🧱']
 };
 
 /*
+  timeLimit       : পুরো লেভেলের সময়সীমা (সেকেন্ড)
   decoys          : নকল লোকের সংখ্যা
   size            : প্রতিটা লোকের মাপ (px)
   moveMs          : কতক্ষণ পরপর সবাই জায়গা বদলাবে
@@ -52,35 +59,40 @@ const CONFIG = {
   accessoryChance : নকল লোকের টুপি/চশমা থাকার সম্ভাবনা (০ থেকে ১)
   accessorySize   : টুপি/চশমার মাপ (লোকের মাপের অনুপাতে)
   glow            : আসল লোকের গায়ে আলো থাকবে কিনা
+  marker          : আসল লোকের উপরে ছোট লাল ডট থাকবে কিনা
   obstacles       : গাছ/বাক্সের সংখ্যা (আংশিক আড়াল করে)
 */
 const LEVELS = {
     easy: {
         name: 'সহজ 🟢',
-        decoys: 4, size: 120, moveMs: 2600,
+        timeLimit: 60, decoys: 4, size: 120, moveMs: 2600,
         hue: [90, 270], accessoryChance: 1, accessorySize: 0.45,
-        glow: true, obstacles: 0,
+        glow: true, marker: false, obstacles: 0,
         hint: 'আসল লোকটির চারপাশে গোলাপি আলো আছে, তাকে গুলি করো!'
     },
     medium: {
         name: 'মধ্যম 🟡',
-        decoys: 10, size: 84, moveMs: 2000,
+        timeLimit: 50, decoys: 10, size: 84, moveMs: 2000,
         hue: [25, 60], accessoryChance: 0.7, accessorySize: 0.32,
-        glow: false, obstacles: 3,
-        hint: 'যার কোনো সাজ নেই আর রঙ আসল, তাকে খুঁজে বের করো!'
+        glow: false, marker: true, obstacles: 3,
+        hint: 'যার উপরে ছোট্ট লাল ডট আছে, সে-ই আসল লোক!'
     },
     hard: {
         name: 'কঠিন 🔴',
-        decoys: 19, size: 64, moveMs: 1500,
+        timeLimit: 45, decoys: 19, size: 64, moveMs: 1500,
         hue: [14, 26], accessoryChance: 0.4, accessorySize: 0.24,
-        glow: false, obstacles: 6,
-        hint: 'ভালো করে খোঁজো! আসল লোকের কোনো সাজ নেই, রঙও একদম আসল।'
+        glow: false, marker: true, obstacles: 6,
+        hint: 'ভালো করে খোঁজো! লাল ডট আছে যার উপরে, সে-ই আসল।'
     }
 };
 
 const state = {
     score: 0,
     level: null,
+    levelKey: null,
+    timeLeft: 0,
+    timerId: null,
+    lastTickAt: 0,
     charSize: 100,
     chars: [],          // { el, isTarget }
     obstacles: [],
@@ -222,6 +234,16 @@ function createChar(isTarget, level, size, zIndex) {
     }
 
     el.appendChild(img);
+
+    // আসল লোকের উপরে ছোট লাল ডট (Medium ও Hard এ)
+    if (isTarget && level.marker) {
+        const marker = document.createElement('span');
+        marker.className = 'char-marker';
+        const dot = Math.max(12, Math.round(size * 0.2));
+        marker.style.width = `${dot}px`;
+        marker.style.height = `${dot}px`;
+        el.appendChild(marker);
+    }
 
     if (!isTarget && useSameImage && Math.random() < level.accessoryChance) {
         const acc = document.createElement('span');
@@ -467,10 +489,42 @@ document.addEventListener('pointerdown', handleShot);
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 /* =========================================================
+   Timer (সময়সীমা)
+   ========================================================= */
+function renderTime() {
+    const secs = Math.max(0, Math.ceil(state.timeLeft));
+    timeDisplay.textContent = secs;
+    timeDisplay.classList.toggle('danger', secs <= 10); // শেষ ১০ সেকেন্ডে লাল
+}
+
+function tick() {
+    const now = performance.now();
+    state.timeLeft -= (now - state.lastTickAt) / 1000;
+    state.lastTickAt = now;
+    renderTime();
+
+    if (state.timeLeft <= 0) timeUp();
+}
+
+function stopTimer() {
+    clearInterval(state.timerId);
+    state.timerId = null;
+}
+
+function startTimer() {
+    stopTimer();
+    state.lastTickAt = performance.now(); // পজের পর আবার শুরুতে বাড়তি সময় কাটবে না
+    state.timerId = setInterval(tick, 100);
+}
+
+/* =========================================================
    Game flow
    ========================================================= */
 function resetGame() {
     stopShuffle();
+    stopTimer();
+    loseMusic.pause();
+    loseMusic.currentTime = 0;
     clearTimeout(state.endTimer);
     music.removeEventListener('ended', showGameOver);
     music.pause();
@@ -488,6 +542,8 @@ function resetGame() {
 
     quitBtn.classList.remove('visible');
     levelNameDisplay.textContent = '-';
+    timeDisplay.textContent = '--';
+    timeDisplay.classList.remove('danger');
     updateScore();
 }
 
@@ -495,7 +551,9 @@ function startGame(levelKey) {
     getAudioContext(); // ইউজারের ক্লিকেই সাউন্ড আনলক
     resetGame();
 
+    state.levelKey = levelKey;
     state.level = LEVELS[levelKey];
+    state.timeLeft = state.level.timeLimit;
     state.isGameStarted = true;
     levelNameDisplay.textContent = state.level.name;
 
@@ -505,11 +563,14 @@ function startGame(levelKey) {
 
     buildArena();
     startShuffle(true);
+    renderTime();
+    startTimer();
 }
 
 function finishMission() {
     state.isSongPlaying = true;
     stopShuffle();
+    stopTimer(); // মিশন শেষ, তাই আর সময় কমবে না
     setStatus('🎉 মিশন কমপ্লিট! গান চলছে... 🎶', '#00ff88');
 
     if (!music) {
@@ -533,6 +594,23 @@ function showGameOver() {
     gameOverModal.classList.add('active');
 }
 
+function timeUp() {
+    stopTimer();
+    stopShuffle();
+
+    state.isGameStarted = false;
+    arena.textContent = '';
+    state.chars = [];
+    quitBtn.classList.remove('visible');
+
+    finalScoreDisplay.textContent = state.score;
+    setStatus('⏰ সময় শেষ!', '#ff3333');
+
+    loseMusic.currentTime = 0;
+    loseMusic.play().catch((err) => console.log('Music error:', err));
+    timeUpModal.classList.add('active');
+}
+
 function showMenu() {
     setStatus(DEFAULT_STATUS);
     startModal.classList.add('active');
@@ -543,6 +621,7 @@ function pauseGame() {
     if (!state.isGameStarted || state.isPaused) return;
     state.isPaused = true;
     stopShuffle();
+    stopTimer();
     if (state.isSongPlaying) music.pause();
     quitModal.classList.add('active');
 }
@@ -556,6 +635,7 @@ function resumeGame() {
         music.play().catch((err) => console.log('Music error:', err));
     } else {
         startShuffle();
+        startTimer();
     }
 }
 
@@ -583,6 +663,17 @@ document.addEventListener('visibilitychange', () => {
 /* ---------- Buttons ---------- */
 document.querySelectorAll('.level-btn').forEach((btn) => {
     btn.addEventListener('click', () => startGame(btn.dataset.level));
+});
+
+retryBtn.addEventListener('click', () => {
+    timeUpModal.classList.remove('active');
+    startGame(state.levelKey); // একই লেভেল আবার
+});
+
+timeUpMenuBtn.addEventListener('click', () => {
+    timeUpModal.classList.remove('active');
+    resetGame();
+    showMenu();
 });
 
 restartBtn.addEventListener('click', () => {

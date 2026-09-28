@@ -23,7 +23,8 @@
         <div class="score-board">
             <span>স্কোর: <strong id="score">0</strong></span> |
             <span>টার্গেট: <strong id="target-score">50</strong></span> |
-            <span>লেভেল: <strong id="level-name">-</strong></span>
+            <span>লেভেল: <strong id="level-name">-</strong></span> |
+            <span>সময়: <strong id="time-left">--</strong></span>
         </div>
 
         <div class="progress" aria-hidden="true">
@@ -45,22 +46,22 @@
             <h1 id="startTitle">SNIPER TARGET SHOOTER</h1>
             <p>ভিড়ের মধ্যে আসল লোকটিকে খুঁজে বের করে গুলি করো!</p>
             <p class="rules">
-                আসল লোকের কোনো টুপি/চশমা নেই আর রঙ একদম আসল।
+                Medium ও Hard এ আসল লোকের উপরে ছোট লাল ডট থাকে।
                 ভুল লোককে গুলি করলে −১০ পয়েন্ট!
             </p>
 
             <div class="level-list">
                 <button class="game-btn level-btn" data-level="easy" type="button">
                     EASY 🟢
-                    <small>কম ভিড়, আসল লোকের গায়ে গোলাপি আলো</small>
+                    <small>৬০ সেকেন্ড • কম ভিড়, আসল লোকের গায়ে গোলাপি আলো</small>
                 </button>
                 <button class="game-btn level-btn" data-level="medium" type="button">
                     MEDIUM 🟡
-                    <small>বেশি ভিড়, গাছ-বাক্সের আড়াল</small>
+                    <small>৫০ সেকেন্ড • বেশি ভিড়, গাছ-বাক্সের আড়াল, আসল লোকের উপরে লাল ডট</small>
                 </button>
                 <button class="game-btn level-btn" data-level="hard" type="button">
                     HARD 🔴
-                    <small>অনেক ভিড়, প্রায় একই চেহারা</small>
+                    <small>৪৫ সেকেন্ড • অনেক ভিড়, প্রায় একই চেহারা, ছোট লাল ডটই একমাত্র সূত্র</small>
                 </button>
             </div>
         </div>
@@ -78,6 +79,18 @@
         </div>
     </div>
 
+    <!-- Time Up Modal -->
+    <div class="modal" id="timeUpModal" role="dialog" aria-modal="true" aria-labelledby="timeUpTitle">
+        <div class="modal-content">
+            <h1 class="end-title lose-title" id="timeUpTitle">TIME UP ⏰</h1>
+            <p>সময় শেষ! তুমি <strong id="finalScore">0</strong> পয়েন্ট পেয়েছ।</p>
+            <div class="modal-actions">
+                <button class="game-btn" id="retryBtn" type="button">আবার চেষ্টা করো 🔁</button>
+                <button class="game-btn secondary" id="timeUpMenuBtn" type="button">লেভেল বদলাও 🏠</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Game End Overlay Modal -->
     <div class="modal" id="gameOverModal" role="dialog" aria-modal="true" aria-labelledby="endTitle">
         <div class="modal-content">
@@ -89,6 +102,8 @@
 
     <!-- Audio Tag -->
     <audio id="bgMusic" src="music.mp3" preload="auto"></audio>
+    <!-- সময় শেষ হলে এই গান বাজবে -->
+    <audio id="loseMusic" src="music1.mp3" preload="auto"></audio>
 
     <script src="js/app.js"></script>
 </body>
